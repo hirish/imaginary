@@ -6,7 +6,7 @@
 It's almost dependency-free and only uses [`net/http`](http://golang.org/pkg/net/http/) native package without additional abstractions for better [performance](#performance).
 
 Supports multiple [image operations](#supported-image-operations) exposed as a simple [HTTP API](#http-api),
-with additional optional features such as **API token authorization**, **HTTP traffic throttle** strategy and **CORS support** for web clients.
+with additional optional features such as **API token authorization**, **URL signature protection**, **HTTP traffic throttle** strategy and **CORS support** for web clients.
 
 `imaginary` **can read** images **from HTTP POST payloads**, **server local path** or **remote HTTP servers**, supporting **JPEG**, **PNG**, **WEBP**, and optionally **TIFF**, **PDF**, **GIF** and **SVG** formats if `libvips@8.3+` is compiled with proper library bindings.
 
@@ -38,6 +38,7 @@ To get started, take a look the [installation](#installation) steps, [usage](#us
 - [Usage](#usage)
 - [HTTP API](#http-api)
   - [Authorization](#authorization)
+  - [URL signature](#url-signature)
   - [Errors](#errors)
   - [Form data](#form-data)
   - [Params](#params)
@@ -123,6 +124,23 @@ docker stop h2non/imaginary
 ```
 
 You can see all the Docker tags [here](https://hub.docker.com/r/h2non/imaginary/tags/).
+
+Alternatively you may add imaginary to your `docker-compose.yml` file:
+
+```yaml
+version: "3"
+services:
+  imaginary:
+    image: h2non/imaginary:latest
+    # optionally mount a volume as local image source
+    volumes:
+      - images:/mnt/data
+    environment:
+       PORT: 9000
+    command: -enable-url-source -mount /mnt/data
+    ports:
+      - "9000:9000"
+```
 
 ### Heroku
 
@@ -276,6 +294,7 @@ Usage:
   imaginary -enable-url-source -authorization "Basic AwDJdL2DbwrD=="
   imaginary -enable-placeholder
   imaginary -enable-url-source -placeholder ./placeholder.jpg
+  imaginary -enable-url-signature -url-signature-key 4f46feebafc4b5e988f131c4ff8b5997
   imaginary -h | -help
   imaginary -v | -version
 
@@ -296,6 +315,8 @@ Options:
   -enable-url-source        Restrict remote image source processing to certain origins (separated by commas)
   -enable-placeholder       Enable image response placeholder to be used in case of error [default: false]
   -enable-auth-forwarding   Forwards X-Forward-Authorization or Authorization header to the image source server. -enable-url-source flag must be defined. Tip: secure your server from public access to prevent attack vectors
+  -enable-url-signature     Enable URL signature (URL-safe Base64-encoded HMAC digest) [default: false]
+  -url-signature-key        The URL signature key (32 characters minimum)
   -allowed-origins <urls>   Restrict remote image source processing to certain origins (separated by commas)
   -max-allowed-size <bytes> Restrict maximum size of http image source (in bytes)
   -certfile <path>          TLS certificate file path
@@ -368,6 +389,18 @@ Supported custom placeholder image types are: `JPEG`, `PNG` and `WEBP`.
 imaginary -p 8080 -placeholder=placeholder.jpg -enable-url-source
 ```
 
+Enable URL signature (URL-safe Base64-encoded HMAC digest).
+
+This feature is particularly useful to protect against multiple image operations attacks and to verify the requester identity.
+```
+imaginary -p 8080 -enable-url-signature -url-signature-key 4f46feebafc4b5e988f131c4ff8b5997
+```
+
+It is recommanded to pass key as environment variables:
+```
+URL_SIGNATURE_KEY=4f46feebafc4b5e988f131c4ff8b5997 imaginary -p 8080 -enable-url-signature
+```
+
 Increase libvips threads concurrency (experimental):
 ```
 VIPS_CONCURRENCY=10 imaginary -p 8080 -concurrency 10
@@ -419,6 +452,26 @@ Example request with API key:
 POST /crop HTTP/1.1
 Host: localhost:8088
 API-Key: secret
+```
+
+### URL signature
+
+The URL signature is provided by the `sign` request parameter.
+
+The HMAC-SHA256 hash is created by taking the URL path (including the leading /), the request parameters (alphabetically-sorted and concatenated with & into a string). The hash is then base64url-encoded.
+
+Here an example in Go:
+```
+signKey  := "4f46feebafc4b5e988f131c4ff8b5997"
+urlPath  := "/resize"
+urlQuery := "file=image.jpg&height=200&type=jpeg&width=300"
+
+h := hmac.New(sha256.New, []byte(signKey))
+h.Write([]byte(urlPath))
+h.Write([]byte(urlQuery))
+buf := h.Sum(nil)
+
+fmt.Println("sign=" + base64.RawURLEncoding.EncodeToString(buf))
 ```
 
 ### Errors
@@ -495,6 +548,7 @@ Image measures are always in pixels, unless otherwise indicated.
 - **sigma**       `float`  - Size of the gaussian mask to use when blurring an image. Example: `15.0`
 - **minampl**     `float`  - Minimum amplitude of the gaussian filter to use when blurring an image. Default: Example: `0.5`
 - **operations**  `json`   - Pipeline of image operation transformations defined as URL safe encoded JSON array. See [pipeline](#get--post-pipeline) endpoints for more details.
+- **sign**        `string` - URL signature (URL-safe Base64-encoded HMAC digest)
 
 #### GET /
 Content-Type: `application/json`
@@ -518,7 +572,7 @@ Provides some useful statistics about the server stats with the following struct
 - **uptime** `number` - Server process uptime in seconds.
 - **allocatedMemory** `number` - Currently allocated memory in megabytes.
 - **totalAllocatedMemory** `number` - Total allocated memory over the time in megabytes.
-- **gorouting** `number` - Number of running gorouting.
+- **goroutines** `number` - Number of running goroutines.
 - **cpus** `number` - Number of used CPU cores.
 
 Example response:

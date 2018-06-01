@@ -3,7 +3,7 @@
 FROM ubuntu:16.04 as builder
 MAINTAINER tomas@aparicio.me
 
-ENV LIBVIPS_VERSION 8.6.2
+ENV LIBVIPS_VERSION 8.6.3
 
 # Installs libvips + required libraries
 RUN \
@@ -11,6 +11,7 @@ RUN \
   # Install dependencies
   apt-get update && \
   DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  ca-certificates \
   automake build-essential curl \
   gobject-introspection gtk-doc-tools libglib2.0-dev libjpeg-turbo8-dev libpng12-dev \
   libwebp-dev libtiff5-dev libgif-dev libexif-dev libxml2-dev libpoppler-glib-dev \
@@ -42,7 +43,7 @@ ENV GOLANG_VERSION 1.10
 
 # gcc for cgo
 RUN apt-get update && apt-get install -y \
-    gcc curl git libc6-dev make ca-certificates \
+    gcc curl git libc6-dev make \
     --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
@@ -68,7 +69,7 @@ RUN go get -u github.com/golang/dep/cmd/dep
 COPY . $GOPATH/src/github.com/h2non/imaginary
 
 # Compile imaginary
-RUN go build -race -o bin/imaginary github.com/h2non/imaginary
+RUN go build -o bin/imaginary github.com/h2non/imaginary
 
 FROM ubuntu:16.04
 
@@ -89,6 +90,7 @@ RUN \
 COPY --from=builder /usr/local/lib /usr/local/lib
 RUN ldconfig
 COPY --from=builder /go/bin/imaginary bin/
+COPY --from=builder /etc/ssl/certs /etc/ssl/certs
 
 # Server port to listen
 ENV PORT 9000
