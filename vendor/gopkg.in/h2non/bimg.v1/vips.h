@@ -348,7 +348,7 @@ vips_flatten_background_brigde(VipsImage *in, VipsImage **out, double r, double 
 }
 
 int
-vips_init_image (void *buf, size_t len, int imageType, VipsImage **out) {
+vips_init_image (void *buf, size_t len, int imageType, double pdfDPI, VipsImage **out) {
 	int code = 1;
 
 	if (imageType == JPEG) {
@@ -364,7 +364,7 @@ vips_init_image (void *buf, size_t len, int imageType, VipsImage **out) {
 	} else if (imageType == GIF) {
 		code = vips_gifload_buffer(buf, len, out, "access", VIPS_ACCESS_RANDOM, NULL);
 	} else if (imageType == PDF) {
-		code = vips_pdfload_buffer(buf, len, out, "access", VIPS_ACCESS_RANDOM, "dpi", 400.0, NULL);
+		code = vips_pdfload_buffer(buf, len, out, "access", VIPS_ACCESS_RANDOM, "dpi", pdfDPI, NULL);
 	} else if (imageType == SVG) {
 		code = vips_svgload_buffer(buf, len, out, "access", VIPS_ACCESS_RANDOM, NULL);
 #endif

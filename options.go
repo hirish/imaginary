@@ -16,6 +16,7 @@ type ImageOptions struct {
 	Margin        int
 	Factor        int
 	DPI           int
+	PDFDPI        int
 	TextWidth     int
 	Flip          bool
 	Flop          bool
@@ -57,6 +58,7 @@ func BimgOptions(o ImageOptions) bimg.Options {
 	opts := bimg.Options{
 		Width:          o.Width,
 		Height:         o.Height,
+		PDFDPI:         o.PDFDPI,
 		Flip:           o.Flip,
 		Flop:           o.Flop,
 		Quality:        o.Quality,
